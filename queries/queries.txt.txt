@@ -1,0 +1,169 @@
+#Creating a table for only Delhi Historical data (Filtering out)
+CREATE TABLE `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi` AS
+SELECT *
+FROM `bigdatafinalproject-407915.aq_dataset.aq_hist_tbl`
+WHERE City = 'Delhi';
+
+#Creating a table for only Delhi Live data (Filtering out)
+CREATE OR REPLACE TABLE `bigdatafinalproject-407915.aq_dataset.aq_live_delhi` AS
+SELECT *
+FROM `bigdatafinalproject-407915.aq_dataset.weather_live_delhi`
+WHERE region = 'Delhi';
+
+#Descriptive Statistics of Historical delhi data
+SELECT 
+  AVG(PM2_5) as average_PM25, 
+  AVG(PM10) as average_PM10, 
+  AVG(AQI) as average_AQI, 
+  STDDEV(PM2_5) as stddev_PM25, 
+  STDDEV(PM10) as stddev_PM10, 
+  STDDEV(AQI) as stddev_AQI
+FROM 
+  `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`;
+
+#Correlation Analysis
+SELECT 
+  CORR(PM2_5, AQI) as corr_PM25_AQI, 
+  CORR(PM10, AQI) as corr_PM10_AQI
+FROM 
+  `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`;
+
+#Time Series Data Extraction
+SELECT 
+  Date, 
+  PM2_5, 
+  PM10, 
+  AQI 
+FROM 
+  `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`
+ORDER BY 
+  Date;
+
+#Filling Missing Values with Average
+
+CREATE OR REPLACE TABLE `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi` AS
+SELECT
+  City,
+  Date,
+  COALESCE(PM2_5, AVG(PM2_5) OVER()) AS PM2_5,
+  COALESCE(PM10, AVG(PM10) OVER()) AS PM10,
+  COALESCE(SO2, AVG(SO2) OVER()) AS SO2,
+  COALESCE(NOx, AVG(NOx) OVER()) AS NOx,
+   COALESCE(NH3, AVG(NH3) OVER()) AS NH3,
+    COALESCE(CO, AVG(CO) OVER()) AS CO,
+     COALESCE(O3, AVG(O3) OVER()) AS O3,
+     COALESCE(AQI, AVG(AQI) OVER()) AS AQI,
+     AQI_Bucket
+FROM
+  `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`;
+
+  #Filling missing categorical value(AQI_Bucket)
+
+  CREATE OR REPLACE TABLE `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi` AS
+SELECT
+  City,
+  Date,
+  PM2_5,
+  PM10,
+  SO2,
+  NOx,
+  NH3,
+  CO,
+  O3,
+  AQI,
+  COALESCE(AQI_Bucket, (SELECT AQI_Bucket FROM (
+    SELECT AQI_Bucket, COUNT(*) as count
+    FROM `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`
+    GROUP BY AQI_Bucket
+    ORDER BY count DESC
+    LIMIT 1
+  ))) as AQI_Bucket
+FROM
+  `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`;
+
+  #Linear Regression(AQI)
+CREATE OR REPLACE MODEL `bigdatafinalproject-407915.aq_dataset.aqi_prediction_model`
+OPTIONS(model_type='linear_reg', input_label_cols=['AQI']) AS
+SELECT
+  PM2_5, PM10, SO2, NOx,NH3, CO, O3,  -- Your features
+  AQI  -- Your label
+FROM
+  `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`;
+
+
+#Classification Model(AQI Bucket)
+CREATE OR REPLACE MODEL `bigdatafinalproject-407915.aq_dataset.aqi_bucket_prediction_model`
+OPTIONS(model_type='logistic_reg', input_label_cols=['AQI_Bucket']) AS
+SELECT
+  PM2_5, PM10, SO2, NOx, CO, O3,  -- Your features
+  AQI_Bucket  -- Your label
+FROM
+  `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`;
+
+#Model Evaluation and Prediction
+#--AQI
+SELECT
+  *
+FROM
+  ML.EVALUATE(MODEL `bigdatafinalproject-407915.aq_dataset.aqi_prediction_model`,
+              (SELECT
+                 PM2_5, PM10, SO2, NOx, CO, O3, AQI
+               FROM
+                 `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`));
+
+#--AQI Bucket
+SELECT
+  *
+FROM
+  ML.EVALUATE(MODEL `bigdatafinalproject-407915.aq_dataset.aqi_bucket_prediction_model`,
+              (SELECT
+                 PM2_5, PM10, SO2, NOx, CO, O3, AQI_Bucket
+               FROM
+                 `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`));
+
+--AQI
+SELECT
+  *,
+  predicted_AQI
+FROM
+  ML.PREDICT(MODEL `bigdatafinalproject-407915.aq_dataset.aqi_prediction_model`,
+             (SELECT
+                PM2_5, PM10, SO2, NOx, CO, O3
+              FROM
+                `bigdatafinalproject-407915.aq_dataset.aq_live_delhi`));
+
+--AQI Bucket
+SELECT
+  *,
+  predicted_AQI_Bucket
+FROM
+  ML.PREDICT(MODEL `bigdatafinalproject-407915.aq_dataset.aqi_bucket_prediction_model`,
+             (SELECT
+                PM2_5, PM10, SO2, NOx, CO, O3
+              FROM
+                `bigdatafinalproject-407915.aq_dataset.aq_live_delhi``));
+
+
+
+select * from `bigdatafinalproject-407915.aq_dataset.aq_hist_delhi`    ;             
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
